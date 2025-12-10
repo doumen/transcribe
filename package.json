@@ -1,16 +1,29 @@
 {
-  "name": "gemini-transcribe",
+  "name": "y",
   "version": "1.0.0",
   "description": "",
+  "keywords": [],
+  "homepage": "https://github.com/doumen/transcribe#readme",
+  "bugs": {
+    "url": "https://github.com/doumen/transcribe/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doumen/transcribe.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
   "main": "transcribe.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1"
-  }
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {}
 }
