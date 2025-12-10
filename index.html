@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transcritor Gemini Audio</title>
+    <title>Transcritor Gemini AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -11,27 +11,28 @@
 
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
         
-        <!-- Header -->
         <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
             <h1 class="text-2xl font-bold"><i class="fa-solid fa-wave-square mr-2"></i> Transcritor Gemini AI</h1>
-            <p class="text-blue-100 text-sm mt-1">Converta áudios de Hari Katha para texto (Inglês/Sânscrito)</p>
+            <p class="text-blue-100 text-sm mt-1">Converta áudios de Hari Katha para texto</p>
         </div>
 
         <div class="p-8">
             
-            <!-- Configuração da API -->
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2">URL da API</label>
-                <div class="flex">
-                    <span class="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md">
-                        POST
-                    </span>
-                    <!-- ALTERAÇÃO AQUI: Usar caminho relativo por padrão -->
-                    <input type="text" id="apiUrl" value="/transcribe" 
-                        class="rounded-none rounded-r-lg bg-gray-50 border border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 block w-full text-sm p-2.5"
-                        placeholder="Ex: /transcribe ou https://seu-site.com/transcribe">
+            <!-- Seleção de Modelo (NOVO) -->
+            <div class="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Modelo AI</label>
+                    <select id="modelSelect" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Rápido)</option>
+                        <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Estável)</option>
+                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                    </select>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Deixe como <b>/transcribe</b> se estiver hospedado no mesmo local.</p>
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">URL da API</label>
+                    <input type="text" id="apiUrl" value="/transcribe" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                </div>
             </div>
 
             <!-- Upload -->
@@ -40,37 +41,32 @@
                     <div class="flex flex-col items-center justify-center pt-5 pb-6">
                         <i class="fa-solid fa-cloud-arrow-up text-3xl text-blue-500 mb-2"></i>
                         <p class="text-sm text-gray-500"><span class="font-semibold">Clique para enviar</span> ou arraste o MP3</p>
-                        <p class="text-xs text-gray-400">MP3, OGG, WAV (Máx 20MB)</p>
                     </div>
                     <input id="audioFile" type="file" class="hidden" accept="audio/*" />
                 </label>
             </div>
             
             <div id="fileInfo" class="hidden mb-4 text-center text-sm text-gray-700 font-medium">
-                Arquivo selecionado: <span id="fileName" class="text-blue-600"></span>
+                Arquivo: <span id="fileName" class="text-blue-600"></span>
             </div>
 
-            <!-- Botão -->
             <button id="btnTranscribe" onclick="startTranscription()" class="w-full text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-lg px-5 py-3 text-center transition disabled:opacity-50 disabled:cursor-not-allowed">
                 Iniciar Transcrição
             </button>
 
-            <!-- Status / Loading -->
+            <!-- Status -->
             <div id="statusArea" class="hidden mt-6">
                 <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
                     <div class="bg-blue-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
                 </div>
-                <p id="statusText" class="text-center text-gray-600 text-sm animate-pulse">Enviando arquivo para o servidor...</p>
+                <p id="statusText" class="text-center text-gray-600 text-sm animate-pulse">Processando...</p>
             </div>
 
             <!-- Resultado -->
             <div id="resultArea" class="hidden mt-8">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-lg font-bold text-gray-800">Transcrição:</h3>
-                    <div class="space-x-2">
-                        <span id="modelBadge" class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Modelo: --</span>
-                        <button onclick="copyToClipboard()" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fa-regular fa-copy"></i> Copiar</button>
-                    </div>
+                    <button onclick="copyToClipboard()" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fa-regular fa-copy"></i> Copiar</button>
                 </div>
                 <textarea id="outputField" rows="10" readonly class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 font-mono"></textarea>
             </div>
@@ -87,9 +83,7 @@
         const statusText = document.getElementById('statusText');
         const resultArea = document.getElementById('resultArea');
         const outputField = document.getElementById('outputField');
-        const modelBadge = document.getElementById('modelBadge');
 
-        // Mostrar nome do arquivo ao selecionar
         fileInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
                 fileInfo.classList.remove('hidden');
@@ -99,65 +93,44 @@
 
         async function startTranscription() {
             const file = fileInput.files[0];
-            const urlInput = document.getElementById('apiUrl').value;
+            const model = document.getElementById('modelSelect').value; // PEGAR MODELO ESCOLHIDO
+            let url = document.getElementById('apiUrl').value;
             
-            // Lógica inteligente para URL
-            let url = urlInput;
-            if (url.startsWith("/")) {
-                // Se for relativo (/transcribe), usa a origem atual (localhost ou render)
-                url = window.location.origin + url;
-            }
+            if (url.startsWith("/")) url = window.location.origin + url;
 
-            if (!file) {
-                alert("Por favor, selecione um arquivo de áudio primeiro.");
-                return;
-            }
+            if (!file) { alert("Selecione um arquivo!"); return; }
 
-            // UI Reset
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processando...';
             statusArea.classList.remove('hidden');
             resultArea.classList.add('hidden');
-            statusText.textContent = "Enviando arquivo para a nuvem (Isso pode demorar 1 min se o servidor estiver dormindo)...";
+            statusText.textContent = `Enviando para o modelo ${model}...`;
 
             const formData = new FormData();
             formData.append("audio", file);
+            formData.append("model", model); // ENVIAR MODELO PARA O SERVIDOR
 
             try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                statusText.textContent = "O Google Gemini está transcrevendo...";
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
-                }
-
+                const response = await fetch(url, { method: 'POST', body: formData });
                 const data = await response.json();
 
-                // Sucesso
+                if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+
                 statusArea.classList.add('hidden');
                 resultArea.classList.remove('hidden');
                 outputField.value = data.transcription;
-                modelBadge.textContent = `Modelo: ${data.model || 'Desconhecido'}`;
                 
             } catch (error) {
                 statusArea.classList.add('hidden');
-                alert(`Erro na transcrição:\n${error.message}`);
-                console.error(error);
+                alert(`Erro: ${error.message}`);
             } finally {
                 btn.disabled = false;
-                btn.innerText = "Iniciar Transcrição";
             }
         }
 
         function copyToClipboard() {
             outputField.select();
             document.execCommand('copy');
-            alert("Texto copiado!");
+            alert("Copiado!");
         }
     </script>
 </body>
