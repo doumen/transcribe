@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const cors = require('cors'); // <--- NOVO
+const cors = require('cors');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { GoogleAIFileManager, FileState } = require("@google/generative-ai/server");
 const fs = require('fs');
@@ -10,91 +10,93 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Habilitar CORS para permitir que páginas Web acessem a API
-app.use(cors()); // <--- IMPORTANTE
+app.use(cors());
 
 const upload = multer({ dest: 'uploads/' });
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// Mesma lista de modelos do seu script anterior
+// Lista ampliada de modelos para garantir fallback
 const MODEL_CANDIDATES = [
     "gemini-2.5-flash",          
     "gemini-2.0-flash-exp",
-    "gemini-2.0-flash",          
-    "gemini-flash-latest",
-    "gemini-1.5-flash"
+    "gemini-1.5-flash",
+    "gemini-flash-latest"
 ];
 
-// Servir a página HTML
 app.get('/', (req, res) => {
-    // Certifique-se de que o arquivo 'index.html' está na mesma pasta que server.js
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
-    // 1. Validações
-    if (!API_KEY) return res.status(500).json({ error: "API Key não configurada." });
+    
+    // LOG DE DEBUG: Verificar se a chave está a ser lida
+    if (!API_KEY) {
+        console.error("❌ ERRO CRÍTICO: API_KEY não encontrada nas variáveis de ambiente!");
+        return res.status(500).json({ error: "Configuração do servidor incompleta (Falta API Key)." });
+    }
+
     if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado." });
 
     const filePath = req.file.path;
     const mimeType = req.file.mimetype === 'application/octet-stream' ? 'audio/mp3' : req.file.mimetype;
     
-    console.log(`\n[API] Recebido: ${req.file.originalname}`);
+    console.log(`\n[API] Processando: ${req.file.originalname}`);
 
     try {
         const fileManager = new GoogleAIFileManager(API_KEY);
         const genAI = new GoogleGenerativeAI(API_KEY);
 
-        // 2. Upload
+        console.log("   -> Enviando arquivo...");
         const uploadResult = await fileManager.uploadFile(filePath, {
             mimeType: mimeType,
-            displayName: "Web API Audio",
+            displayName: "API Request Audio",
         });
 
         const name = uploadResult.file.name;
         const fileUri = uploadResult.file.uri;
         let fileState = uploadResult.file.state;
 
-        // 3. Processamento
+        console.log("   -> Aguardando conversão...");
         while (fileState === FileState.PROCESSING) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             const fileStatus = await fileManager.getFile(name);
             fileState = fileStatus.state;
-            if (fileState === FileState.FAILED) throw new Error("Processamento falhou no Google.");
+            if (fileState === FileState.FAILED) throw new Error("Google falhou ao processar o áudio.");
         }
 
-        // 4. Transcrição
+        console.log("   -> Iniciando transcrição...");
         let transcriptText = null;
         let activeModel = "";
 
         const richPrompt = `
             STRICT INSTRUCTION: The output MUST be in the Roman alphabet (English letters) ONLY.
-            DO NOT use Devanagari script.
-            
-            **Task:** Transcribe this audio file (Vaishnava spiritual discourse).
-            **Rules:**
-            1. Script: Roman alphabet ONLY.
-            2. Transliterate Sanskrit/Bengali terms (e.g., "Krishna").
-            3. Use paragraphs and occasional timestamps [MM:SS].
+            DO NOT use Devanagari script. Use standard transliteration for Sanskrit terms.
+            Transcribe exactly as spoken. Use paragraphs.
         `;
 
         for (const modelName of MODEL_CANDIDATES) {
             try {
+                process.stdout.write(`      Tentando ${modelName}... `);
                 const model = genAI.getGenerativeModel({ model: modelName });
+                
                 const result = await model.generateContent([
                     { fileData: { mimeType: uploadResult.file.mimeType, fileUri: fileUri } },
                     { text: richPrompt },
                 ]);
+                
                 const response = await result.response;
                 transcriptText = response.text();
                 activeModel = modelName;
+                console.log("✅ SUCESSO!");
                 break;
             } catch (err) {
-                console.log(`Falha no modelo ${modelName}`);
+                console.log("❌ FALHOU");
+                // IMPRIMIR O MOTIVO REAL DO ERRO NO LOG
+                console.error(`         Motivo: ${err.message || err}`);
             }
         }
 
-        if (!transcriptText) throw new Error("Todos os modelos falharam.");
+        if (!transcriptText) throw new Error("Todos os modelos falharam. Verifique os logs do servidor para o motivo.");
 
         fs.unlinkSync(filePath);
         res.json({
@@ -104,12 +106,12 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Erro:", error.message);
+        console.error("Erro Fatal:", error.message);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.listen(port, () => {
-    console.log(`Servidor rodando na porta ${port}`);
+    console.log(`Servidor iniciado na porta ${port}`);
 });
