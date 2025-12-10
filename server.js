@@ -25,9 +25,10 @@ const MODEL_CANDIDATES = [
     "gemini-1.5-flash"
 ];
 
-// Rota de Teste (Para saber se o servidor está online)
+// Servir a página HTML
 app.get('/', (req, res) => {
-    res.send('Servidor de Transcrição está Online! Use POST /transcribe');
+    // Certifique-se de que o arquivo 'index.html' está na mesma pasta que server.js
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
