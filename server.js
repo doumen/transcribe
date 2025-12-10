@@ -15,7 +15,7 @@ app.use(cors());
 const upload = multer({ dest: 'uploads/' });
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// Lista ampliada de modelos para garantir fallback
+// Lista de modelos
 const MODEL_CANDIDATES = [
     "gemini-2.5-flash",          
     "gemini-2.0-flash-exp",
@@ -29,18 +29,22 @@ app.get('/', (req, res) => {
 
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
     
-    // LOG DE DEBUG: Verificar se a chave está a ser lida
     if (!API_KEY) {
-        console.error("❌ ERRO CRÍTICO: API_KEY não encontrada nas variáveis de ambiente!");
-        return res.status(500).json({ error: "Configuração do servidor incompleta (Falta API Key)." });
+        console.error("❌ ERRO: API_KEY ausente.");
+        return res.status(500).json({ error: "Servidor sem API Key configurada." });
     }
 
     if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado." });
 
     const filePath = req.file.path;
-    const mimeType = req.file.mimetype === 'application/octet-stream' ? 'audio/mp3' : req.file.mimetype;
     
-    console.log(`\n[API] Processando: ${req.file.originalname}`);
+    // --- CORREÇÃO DO MIME TYPE (O Pulo do Gato) ---
+    // O Gemini rejeita 'application/ogg', então forçamos 'audio/ogg'
+    let mimeType = req.file.mimetype;
+    if (mimeType === 'application/octet-stream') mimeType = 'audio/mp3';
+    if (mimeType === 'application/ogg') mimeType = 'audio/ogg'; // <--- CORREÇÃO AQUI
+    
+    console.log(`\n[API] Processando: ${req.file.originalname} (Como: ${mimeType})`);
 
     try {
         const fileManager = new GoogleAIFileManager(API_KEY);
@@ -91,14 +95,25 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
                 break;
             } catch (err) {
                 console.log("❌ FALHOU");
-                // IMPRIMIR O MOTIVO REAL DO ERRO NO LOG
-                console.error(`         Motivo: ${err.message || err}`);
+                const msg = err.message || JSON.stringify(err);
+                
+                // NOVO: Proteção contra bloqueio de Cota
+                if (msg.includes("429")) {
+                    console.error("         -> Cota excedida! Parando tentativas para não bloquear a chave.");
+                    throw new Error("Limite de cota atingido (429). Tente novamente em 1 minuto.");
+                } else {
+                    console.error(`         -> Erro: ${msg.substring(0, 100)}...`);
+                    // Espera 1s antes de tentar o próximo modelo (se não for cota)
+                    await new Promise(r => setTimeout(r, 1000));
+                }
             }
         }
 
-        if (!transcriptText) throw new Error("Todos os modelos falharam. Verifique os logs do servidor para o motivo.");
+        if (!transcriptText) throw new Error("Todos os modelos falharam.");
 
-        fs.unlinkSync(filePath);
+        // Limpeza
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        
         res.json({
             status: "success",
             model: activeModel,
@@ -108,7 +123,10 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
     } catch (error) {
         console.error("Erro Fatal:", error.message);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        res.status(500).json({ error: error.message });
+        
+        // Retorna erro amigável para o front-end
+        const userMsg = error.message.includes("429") ? "Limite de cota excedido. Aguarde 1 minuto." : error.message;
+        res.status(500).json({ error: userMsg });
     }
 });
 
