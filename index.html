@@ -18,15 +18,15 @@
 
         <div class="p-8">
             
-            <!-- Seleção de Modelo (NOVO) -->
+            <!-- Seleção de Modelo -->
             <div class="mb-6 grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2">Modelo AI</label>
                     <select id="modelSelect" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Rápido)</option>
+                        <option value="gemini-flash-latest" selected>Gemini Flash Latest (Recomendado)</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                         <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Estável)</option>
-                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
                     </select>
                 </div>
                 <div>
@@ -62,13 +62,22 @@
                 <p id="statusText" class="text-center text-gray-600 text-sm animate-pulse">Processando...</p>
             </div>
 
-            <!-- Resultado -->
-            <div id="resultArea" class="hidden mt-8">
+            <!-- Resultado (AGORA VISÍVEL MAS DESABILITADO INICIALMENTE) -->
+            <div id="resultArea" class="mt-8 opacity-50 pointer-events-none transition-opacity duration-300">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-lg font-bold text-gray-800">Transcrição:</h3>
-                    <button onclick="copyToClipboard()" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fa-regular fa-copy"></i> Copiar</button>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="flex space-x-2">
+                        <button id="btnDownload" onclick="downloadTxt()" class="text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-4 py-2 transition shadow-sm flex items-center">
+                            <i class="fa-solid fa-download mr-2"></i> Baixar .txt
+                        </button>
+                        <button onclick="copyToClipboard()" class="text-white bg-gray-600 hover:bg-gray-700 font-medium rounded-lg text-sm px-4 py-2 transition shadow-sm flex items-center">
+                            <i class="fa-regular fa-copy mr-2"></i> Copiar
+                        </button>
+                    </div>
                 </div>
-                <textarea id="outputField" rows="10" readonly class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 font-mono"></textarea>
+                <textarea id="outputField" rows="10" readonly class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 font-mono" placeholder="O texto aparecerá aqui..."></textarea>
             </div>
 
         </div>
@@ -93,21 +102,25 @@
 
         async function startTranscription() {
             const file = fileInput.files[0];
-            const model = document.getElementById('modelSelect').value; // PEGAR MODELO ESCOLHIDO
+            const model = document.getElementById('modelSelect').value;
             let url = document.getElementById('apiUrl').value;
             
             if (url.startsWith("/")) url = window.location.origin + url;
 
             if (!file) { alert("Selecione um arquivo!"); return; }
 
+            // UI Reset
             btn.disabled = true;
             statusArea.classList.remove('hidden');
-            resultArea.classList.add('hidden');
+            // Deixamos a área visível mas com opacidade baixa enquanto processa
+            resultArea.classList.add('opacity-50', 'pointer-events-none');
+            outputField.value = "Aguardando servidor...";
+            
             statusText.textContent = `Enviando para o modelo ${model}...`;
 
             const formData = new FormData();
             formData.append("audio", file);
-            formData.append("model", model); // ENVIAR MODELO PARA O SERVIDOR
+            formData.append("model", model);
 
             try {
                 const response = await fetch(url, { method: 'POST', body: formData });
@@ -115,13 +128,15 @@
 
                 if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
 
+                // SUCESSO: Habilita a área de resultado
                 statusArea.classList.add('hidden');
-                resultArea.classList.remove('hidden');
+                resultArea.classList.remove('opacity-50', 'pointer-events-none');
                 outputField.value = data.transcription;
                 
             } catch (error) {
                 statusArea.classList.add('hidden');
                 alert(`Erro: ${error.message}`);
+                outputField.value = "Erro na transcrição.";
             } finally {
                 btn.disabled = false;
             }
@@ -131,6 +146,28 @@
             outputField.select();
             document.execCommand('copy');
             alert("Copiado!");
+        }
+
+        function downloadTxt() {
+            const text = outputField.value;
+            if (!text || text === "Aguardando servidor..." || text === "Erro na transcrição.") {
+                alert("Não há texto válido para baixar.");
+                return;
+            }
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().slice(0, 10);
+            a.download = `transcricao_${date}.txt`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>
